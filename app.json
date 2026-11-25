@@ -11,7 +11,16 @@
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.algomax.pocket"
+      "bundleIdentifier": "com.algomax.pocket",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "304c1a00-f1d4-42ae-bff3-51b4c021eb54"
+      }
     }
   }
 }
