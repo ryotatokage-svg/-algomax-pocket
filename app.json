@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
+    "scheme": "algomax",
+    "plugins": [
+      "expo-router"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.algomax.pocket"
