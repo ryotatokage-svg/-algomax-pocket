@@ -1,37 +1,80 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>ALGOMAX</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
-    <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
-  </head>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080d17"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="ALGOMAX"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/icon.svg"><title>ALGOMAX</title><style>
+*{box-sizing:border-box}body{margin:0;padding:env(safe-area-inset-top) 16px 30px;background:#080d17;color:#edf3ff;font:15px -apple-system,BlinkMacSystemFont,sans-serif}.wrap{max-width:720px;margin:auto}.top,.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.top{padding:20px 2px}.brand{font-size:23px;font-weight:900;letter-spacing:2px}.brand span{color:#6aa8ff}.badge,.pill{font-size:11px;padding:7px 10px;border-radius:20px;background:#292315;color:#f5c66a;border:1px solid #66532e}.pill.live{background:#0f2a22;color:#28d69a;border-color:#216b54}h1{font-size:25px;margin:8px 0 3px}.muted,.label,.tiny{color:#91a0b8}.muted,.tiny{font-size:12px}.card{margin-top:14px;padding:18px;border:1px solid #26364d;border-radius:18px;background:linear-gradient(145deg,#152137,#0d1523)}.label{font-size:12px}.balance{font-size:34px;font-weight:800;margin:8px 0 16px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{padding:13px;border-radius:12px;background:#0a1422;border:1px solid #26364d}.stat strong{display:block;font-size:18px;margin-top:7px}.green{color:#28d69a}.red{color:#ff637c}.section{font-weight:800;margin-bottom:14px}.price{font-size:27px;font-weight:800;margin:8px 0}.chart{width:100%;height:155px}.chart path{fill:none;stroke:#6aa8ff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.item{display:flex;justify-content:space-between;padding:13px 0;border-top:1px solid #26364d}.item:first-of-type{border:0}.notice{font-size:12px;line-height:1.6;color:#c4cede;background:#172235;border:1px solid #34445d;padding:12px;border-radius:12px;margin-top:12px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}button{border:0;border-radius:12px;padding:14px;font-weight:800;background:#28d69a;color:#07150f;cursor:pointer}button.stop{background:#ff637c;color:#21070c}button:disabled{opacity:.5}footer{text-align:center;color:#64738b;font-size:11px;padding:22px}@media(min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}}
+</style></head><body><main class="wrap"><header class="top"><div class="brand">ALGO<span>MAX</span></div><div class="badge" id="modeBadge">SUPABASE LIVE</div></header><div class="row"><div><h1>ダッシュボード</h1><div class="muted">AIトレード・モニター（XAUUSD）</div></div><div class="pill" id="connPill">● 接続中...</div></div>
+<section class="card"><div class="row"><span class="label">口座残高</span><span class="label">USD</span></div><div class="balance" id="balance">$0.00</div><div class="grid"><div class="stat"><span class="label">本日の損益</span><strong class="green" id="dailyProfit">+$0.00</strong></div><div class="stat"><span class="label">稼働状態</span><strong style="color:#f5c66a" id="state">確認中...</strong></div><div class="stat"><span class="label">勝率（サンプル）</span><strong>62.5%</strong></div><div class="stat"><span class="label">保有ポジション</span><strong id="positions">0</strong></div></div></section>
+<section class="card"><div class="row"><div class="section">マーケット概要</div><div class="pill">XAUUSD</div></div><div class="label">XAUUSD · GOLD</div><div class="row"><div class="price">2,350.00</div><strong class="green">+0.42%</strong></div><svg class="chart" viewBox="0 0 600 160" preserveAspectRatio="none"><path d="M0 130 L35 118 70 124 105 90 140 102 175 75 210 86 245 55 280 70 315 48 350 65 385 35 420 50 455 28 490 42 525 19 560 30 600 12"/></svg><div class="tiny">※チャートは表示用プレビューです。</div></section>
+<section class="card"><div class="section">取引コントロール</div><div class="actions"><button id="btnStart" onclick="setActive(true)">稼働開始</button><button id="btnStop" class="stop" onclick="setActive(false)">停止</button></div><div class="notice" id="msg">Supabaseと同期中...</div></section><footer>ALGOMAX · Supabase Sync · v1.1</footer></main><script>
+const SUPABASE_URL = "https://tnhvexohouzzycgzscxl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_WsWNdDvKgO5Tcuu6U0X30g_Xk_-xRtn";
 
-  <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
-  <script src="/_expo/static/js/web/entry-d13ee5c33f2bffd518d118ba85124a0e.js" defer></script>
-</body>
-</html>
+const headers = {
+  "apikey": SUPABASE_KEY,
+  "Authorization": "Bearer " + SUPABASE_KEY,
+  "Content-Type": "application/json",
+  "Prefer": "return=representation"
+};
+
+function renderState(row){
+  const active = Boolean(row.is_active);
+  const s = document.getElementById("state");
+  s.textContent = active ? "稼働中" : "停止中";
+  s.style.color = active ? "#28d69a" : "#f5c66a";
+
+  const bal = Number(row.balance || 0);
+  document.getElementById("balance").textContent = "$" + bal.toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const pnl = Number(row.daily_profit || 0);
+  const pnlEl = document.getElementById("dailyProfit");
+  pnlEl.textContent = (pnl >= 0 ? "+$" : "-$") + Math.abs(pnl).toLocaleString("en-US", {minimumFractionDigits:2, maximumFractionDigits:2});
+  pnlEl.className = pnl >= 0 ? "green" : "red";
+
+  document.getElementById("positions").textContent = String(row.positions ?? 0);
+  document.getElementById("msg").textContent = "最新ログ: " + (row.last_log || "待機中");
+
+  const pill = document.getElementById("connPill");
+  pill.textContent = "● Supabase接続OK";
+  pill.className = "pill live";
+}
+
+async function fetchStatus(){
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bot_status?id=eq.1&select=*`, { headers });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(data && data[0]) renderState(data[0]);
+  } catch(e){
+    const pill = document.getElementById("connPill");
+    pill.textContent = "● 接続エラー";
+    pill.className = "pill";
+    document.getElementById("msg").textContent = "通信エラー: " + e.message + "（URLやポリシーを確認してください）";
+  }
+}
+
+async function setActive(val){
+  const btnStart = document.getElementById("btnStart");
+  const btnStop = document.getElementById("btnStop");
+  btnStart.disabled = btnStop.disabled = true;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bot_status?id=eq.1`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        is_active: val,
+        last_log: val ? "スマホから稼働開始を送信" : "スマホから停止を送信",
+        updated_at: new Date().toISOString()
+      })
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if(data && data[0]) renderState(data[0]);
+  } catch(e){
+    document.getElementById("msg").textContent = "更新失敗: " + e.message;
+  } finally {
+    btnStart.disabled = btnStop.disabled = false;
+  }
+}
+
+fetchStatus();
+setInterval(fetchStatus, 5000);
+if("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+</script></body></html>
