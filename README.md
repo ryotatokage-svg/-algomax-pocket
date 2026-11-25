@@ -1,1 +1,1 @@
-# -algomax-pocket
+# algomax-pocket
