@@ -56,7 +56,7 @@ def send_ntfy(topic, title, message, priority="high"):
 
 def fetch_xauusd_candles():
     for symbol in ["XAUUSD=X", "GC=F"]:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=5m&range=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=15m&range=5d"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         try:
             with urllib.request.urlopen(req, timeout=15) as res:
@@ -66,11 +66,11 @@ def fetch_xauusd_candles():
                 closes = [c for c in quote["close"] if c is not None]
                 highs = [h for h in quote["high"] if h is not None]
                 lows = [l for l in quote["low"] if l is not None]
-                if len(closes) >= 30:
+                if len(closes) >= 60:
                     return closes, highs, lows, symbol
         except Exception as e:
             print(f"Fetch failed for {symbol}:", e)
-    raise RuntimeError("XAUUSDの価格データを取得できませんでした")
+    raise RuntimeError("XAUUSDの15分足データを取得できませんでした")
 
 
 def calc_ema(values, period):
@@ -119,70 +119,132 @@ def analyze():
 
     closes, highs, lows, sym = fetch_xauusd_candles()
     price = round(closes[-1], 2)
+
     ema9_now = calc_ema(closes, 9)
     ema21_now = calc_ema(closes, 21)
+    ema50_now = calc_ema(closes, 50)
+
     ema9_prev = calc_ema(closes[:-1], 9)
     ema21_prev = calc_ema(closes[:-1], 21)
+    ema21_3ago = calc_ema(closes[:-3], 21)
+    ema50_3ago = calc_ema(closes[:-3], 50)
+
     rsi = round(calc_rsi(closes, 14), 1)
-    atr = max(round(calc_atr(highs, lows, closes, 14), 2), 2.5)
+    atr = max(round(calc_atr(highs, lows, closes, 14), 2), 4.0)
+
+    ema21_slope = ema21_now - ema21_3ago
+    ema50_slope = ema50_now - ema50_3ago
 
     prev_signal = (row.get("signal") or "WAIT").upper()
     prev_entry = float(row.get("entry_price") or 0)
     prev_tp = float(row.get("tp_price") or 0)
+    prev_sl = float(row.get("sl_price") or 0)
     topic = (row.get("ntfy_topic") or "").strip()
 
     signal = "WAIT"
     entry_price = prev_entry
     tp_price = prev_tp
-    sl_price = float(row.get("sl_price") or 0)
-    reason = f"RSI={rsi} / EMA9={ema9_now:.2f}, EMA21={ema21_now:.2f}（明確なクロス待ち）"
+    sl_price = prev_sl
+    reason = f"[15m] RSI={rsi} / EMA9={ema9_now:.2f}, EMA21={ema21_now:.2f}, EMA50={ema50_now:.2f}（トレンド発生待ち）"
     notify_msg = None
+    notify_priority = "urgent"
 
-    # 1. Check Take-Profit (利確タイミング判定)
-    if prev_signal == "BUY" and prev_tp > 0:
-        if price >= prev_tp or rsi >= 72:
+    # 1. 保有中トレンドの継続・転換（トレンド転換サインまで引っ張る）判定
+    if prev_signal == "BUY":
+        trend_reversed = (ema9_now < ema21_now and ema9_prev < ema21_prev) or (
+            price < ema21_now and ema21_slope < 0
+        )
+        if trend_reversed:
             signal = "TP_EXIT"
-            reason = f"買いポジション利確タイミング到達（現在値 {price} / RSI {rsi}）"
-            notify_msg = f"【XAUUSD 利確タイミング】BUY決済目安に到達！現在値: {price}（目標TP: {prev_tp} / RSI: {rsi}）"
+            reason = (
+                f"[15m] 上昇トレンド転換サイン（現在値 {price} / EMA9 {ema9_now:.2f} / "
+                f"EMA21 {ema21_now:.2f} / RSI {rsi}）"
+            )
+            notify_msg = (
+                f"【XAUUSD 15m 利確サイン】上昇トレンド転換を検知！BUY決済検討｜"
+                f"現在値: {price}（EMA21: {ema21_now:.2f} / RSI: {rsi}）"
+            )
         else:
+            new_sl = max(prev_sl, round(ema21_now - atr * 1.2, 2))
             signal = "BUY"
-            reason = f"BUY継続中（目標TP: {prev_tp} / 損切りSL: {sl_price} / RSI: {rsi}）"
+            sl_price = new_sl
+            reason = (
+                f"[15m] 上昇トレンド継続中・利益伸ばし中（現在値 {price} / "
+                f"目安SL: {sl_price} / RSI: {rsi}）"
+            )
 
-    elif prev_signal == "SELL" and prev_tp > 0:
-        if price <= prev_tp or rsi <= 28:
+    elif prev_signal == "SELL":
+        trend_reversed = (ema9_now > ema21_now and ema9_prev > ema21_prev) or (
+            price > ema21_now and ema21_slope > 0
+        )
+        if trend_reversed:
             signal = "TP_EXIT"
-            reason = f"売りポジション利確タイミング到達（現在値 {price} / RSI {rsi}）"
-            notify_msg = f"【XAUUSD 利確タイミング】SELL決済目安に到達！現在値: {price}（目標TP: {prev_tp} / RSI: {rsi}）"
+            reason = (
+                f"[15m] 下降トレンド転換サイン（現在値 {price} / EMA9 {ema9_now:.2f} / "
+                f"EMA21 {ema21_now:.2f} / RSI {rsi}）"
+            )
+            notify_msg = (
+                f"【XAUUSD 15m 利確サイン】下降トレンド転換を検知！SELL決済検討｜"
+                f"現在値: {price}（EMA21: {ema21_now:.2f} / RSI: {rsi}）"
+            )
         else:
+            new_sl = (
+                min(prev_sl, round(ema21_now + atr * 1.2, 2))
+                if prev_sl > 0
+                else round(ema21_now + atr * 1.2, 2)
+            )
             signal = "SELL"
-            reason = f"SELL継続中（目標TP: {prev_tp} / 損切りSL: {sl_price} / RSI: {rsi}）"
+            sl_price = new_sl
+            reason = (
+                f"[15m] 下降トレンド継続中・利益伸ばし中（現在値 {price} / "
+                f"目安SL: {sl_price} / RSI: {rsi}）"
+            )
 
-    # 2. Check New Entry Signal (新規エントリー判定)
+    # 2. 新規トレンドエントリー判定（15分足の順張り・トレンド継続）
     if signal in ("WAIT", "TP_EXIT"):
-        if (ema9_prev <= ema21_prev and ema9_now > ema21_now and 45 <= rsi <= 68) or (
-            ema9_now > ema21_now and 52 <= rsi <= 62 and prev_signal == "WAIT"
-        ):
+        up_trend = (
+            price > ema9_now > ema21_now > ema50_now
+            and ema21_slope > 0
+            and ema50_slope >= 0
+            and 50 <= rsi <= 72
+        )
+        down_trend = (
+            price < ema9_now < ema21_now < ema50_now
+            and ema21_slope < 0
+            and ema50_slope <= 0
+            and 28 <= rsi <= 50
+        )
+
+        if up_trend and prev_signal != "BUY":
             signal = "BUY"
             entry_price = price
-            tp_price = round(price + atr * 1.8, 2)
-            sl_price = round(price - atr * 1.2, 2)
-            reason = f"上昇トレンド発生（EMA9 > EMA21, RSI={rsi}）"
-            notify_msg = f"【XAUUSD BUYサイン】買いエントリー目安: {entry_price} / 利確TP: {tp_price} / 損切りSL: {sl_price}"
+            tp_price = round(price + atr * 4.0, 2)
+            sl_price = round(min(price - atr * 1.5, ema21_now - atr * 0.5), 2)
+            reason = f"[15m] 上昇トレンド検知（EMA9>21>50・傾き上昇・RSI={rsi}）"
+            notify_msg = (
+                f"【XAUUSD 15m BUYサイン】上昇トレンド検知！エントリー目安: {entry_price} / "
+                f"参考TP: {tp_price} / 目安SL: {sl_price}（RSI: {rsi}）"
+            )
 
-        elif (ema9_prev >= ema21_prev and ema9_now < ema21_now and 32 <= rsi <= 55) or (
-            ema9_now < ema21_now and 38 <= rsi <= 48 and prev_signal == "WAIT"
-        ):
+        elif down_trend and prev_signal != "SELL":
             signal = "SELL"
             entry_price = price
-            tp_price = round(price - atr * 1.8, 2)
-            sl_price = round(price + atr * 1.2, 2)
-            reason = f"下降トレンド発生（EMA9 < EMA21, RSI={rsi}）"
-            notify_msg = f"【XAUUSD SELLサイン】売りエントリー目安: {entry_price} / 利確TP: {tp_price} / 損切りSL: {sl_price}"
+            tp_price = round(price - atr * 4.0, 2)
+            sl_price = round(max(price + atr * 1.5, ema21_now + atr * 0.5), 2)
+            reason = f"[15m] 下降トレンド検知（EMA9<21<50・傾き下降・RSI={rsi}）"
+            notify_msg = (
+                f"【XAUUSD 15m SELLサイン】下降トレンド検知！エントリー目安: {entry_price} / "
+                f"参考TP: {tp_price} / 目安SL: {sl_price}（RSI: {rsi}）"
+            )
         else:
             signal = "WAIT"
             entry_price = 0
             tp_price = 0
             sl_price = 0
+            reason = (
+                f"[15m] RSI={rsi} / EMA9={ema9_now:.2f}, EMA21={ema21_now:.2f}, EMA50={ema50_now:.2f}"
+                f"（傾き21:{ema21_slope:+.2f} / トレンド待ち）"
+            )
 
     now_iso = datetime.now(timezone.utc).isoformat()
     log_text = f"[{sym}] 現在値 {price} | 判定: {signal} | {reason}"
@@ -202,7 +264,7 @@ def analyze():
     print("Updated:", log_text)
 
     if notify_msg:
-        send_ntfy(topic, f"ALGOMAX XAUUSD: {signal}", notify_msg, priority="urgent")
+        send_ntfy(topic, f"ALGOMAX XAUUSD 15m: {signal}", notify_msg, priority=notify_priority)
 
 
 if __name__ == "__main__":
